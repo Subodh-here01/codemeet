@@ -197,9 +197,9 @@ function Homepage() {
 
             <div className="w-full sm:w-1/3">
               <h3 className="text-3xl font-bold mb-4">Contact Us</h3>
-              <p>Email: info@codemeet.com</p>
+              <p>Email: userisanalienhunter@gmail.com</p>
               <p>Phone: +123 456 7890</p>
-              <p>Address: 123 Main Street, City, Country</p>
+              <p>Address: 123 Main Street, Bengaluru, India</p>
             </div>
           </div>
           <div className="text-center mt-8">
