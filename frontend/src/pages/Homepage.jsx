@@ -15,13 +15,13 @@ function Homepage() {
 
   const navigate = useNavigate();
 
-  const handleLogout = async () => {
-    try {
-      const res = await fetch("http://localhost:3000/api/logout", {
-        method: "POST",
-        credentials: "include",
-      });
-
+ const handleLogout = async () => {
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+    
       const data = await res.json();
       console.log(data);
       setUser(null);

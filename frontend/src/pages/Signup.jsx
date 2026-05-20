@@ -10,15 +10,16 @@ function Signup() {
   const [email, setEmail] = useState("");
 
   const navigate = useNavigate();
-  const handleSignup = async () => {
-    try {
-      const res = await fetch("http://localhost:3000/api/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name, email, username, password }),
-      });
+ const handleSignup = async () => {
+  try {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name, email, username, password }),
+    });
+
       const data = await res.json();
       console.log(data.message);
       setUser(data.data);
