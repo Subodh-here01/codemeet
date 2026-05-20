@@ -4,8 +4,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-    MONGO_URI: mongodb://host.docker.internal:27017/yourdbname
-    PORT: 3000
+      MONGO_URI: "mongodb://host.docker.internal:27017/codemeet"
+      PORT: "3000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
