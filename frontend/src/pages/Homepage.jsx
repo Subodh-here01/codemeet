@@ -5,7 +5,6 @@ import heroGif from "../assets/job-interview.gif";
 import textEditorImg from "../assets/Text Editor.png";
 import codeEditorImg from "../assets/code editor.png";
 import { useNavigate } from "react-router-dom";
-import { FaSquareXTwitter } from "react-icons/fa6";
 import { FaLinkedin } from "react-icons/fa";
 import { FaSquareGithub } from "react-icons/fa6";
 import InputModal from "../components/InputModal";
@@ -35,7 +34,7 @@ function Homepage() {
   return (
     <>
       <div className="flex p-4 bg-blue-400 justify-between items-center shadow-xl">
-        <div className="text-4xl font-bold text-white">MockInt</div>
+        <div className="text-4xl font-bold text-white">codemeet</div>
         <div className="flex w-3/12 justify-around items-center">
           <p className="text-2xl font-semibold text-white">Home</p>
           <p className="text-2xl font-semibold text-white">Features</p>
@@ -181,16 +180,14 @@ function Homepage() {
               <h3 className="text-3xl font-bold mb-4">Follow Us</h3>
               <div className="flex space-x-4">
                 <a
-                  href="https://www.linkedin.com/in/manthan-khawse-74a898245/"
+                  href="https://www.linkedin.com/in/subodh2106/"
                   className="text-3xl hover:scale-125 transition-all ease-in-out"
                 >
                   <FaLinkedin />
                 </a>
-                <a href="https://x.com/khawse_man69128" className="text-3xl hover:scale-125 transition-all ease-in-out">
-                  <FaSquareXTwitter />
-                </a>
+                
                 <a
-                  href="https://github.com/manthankhawse"
+                  href="https://github.com/Subodh-here01"
                   className="text-3xl hover:scale-125 transition-all ease-in-out"
                 >
                   <FaSquareGithub />
@@ -200,13 +197,13 @@ function Homepage() {
 
             <div className="w-full sm:w-1/3">
               <h3 className="text-3xl font-bold mb-4">Contact Us</h3>
-              <p>Email: info@mockint.com</p>
+              <p>Email: info@codemeet.com</p>
               <p>Phone: +123 456 7890</p>
               <p>Address: 123 Main Street, City, Country</p>
             </div>
           </div>
           <div className="text-center mt-8">
-            <p>&copy; 2024 MockInt. All rights reserved.</p>
+            <p>&copy; 2026 codemeet. All rights reserved.</p>
           </div>
         </div>
       </div>
