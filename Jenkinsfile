@@ -38,12 +38,12 @@ pipeline {
             }
         }
 
-        stage('Dependency Check') {
-            steps {
-                dependencyCheck additionalArguments: '--scan .', odcInstallation: 'dependency-check'
-                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
-            }
-        }
+     stage('Dependency Check') {
+    steps {
+        dependencyCheck odcInstallation: 'dependency-check', additionalArguments: '--scan .'
+        dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+    }
+}
 
         stage('Docker Build') {
             steps {
