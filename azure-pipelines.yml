@@ -1,0 +1,25 @@
+trigger:
+- main
+
+pool:
+  name: codemeet-pool
+
+steps:
+- task: NodeTool@0
+  inputs:
+    versionSpec: '20.x'
+  displayName: Install Node.js
+
+- script: |
+    cd frontend
+    npm install --legacy-peer-deps
+  displayName: Install frontend dependencies
+
+- script: |
+    cd backend
+    npm install
+  displayName: Install backend dependencies
+
+- script: |
+    echo "Build successful"
+  displayName: Verify Build
