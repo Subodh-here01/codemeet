@@ -7,30 +7,36 @@ import connectdb from "./db/connectDb.js";
 import cookieParser from "cookie-parser";
 import auth from "./routes/auth.js";
 
-const port = 3000;
+dotenv.config();
+
+const PORT = process.env.PORT || 3000;
+const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
 
 const app = express();
 const server = createServer(app);
+
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: CLIENT_URL,
     methods: ["GET", "POST"],
     credentials: true,
   },
 });
 
-dotenv.config();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-connectdb();
 app.use(cookieParser());
+
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: CLIENT_URL,
     methods: ["GET", "POST"],
     credentials: true,
   })
 );
+
+connectdb();
+
 app.use("/api", auth);
 
 io.on("connection", (socket) => {
@@ -69,12 +75,16 @@ io.on("connection", (socket) => {
   socket.on("text-change", ({ room, data }) => {
     io.to(room).emit("recieve-text", data);
   });
+
+  socket.on("disconnect", () => {
+    console.log(`User ${socket.id} disconnected`);
+  });
 });
 
 app.get("/", (req, res) => {
-  res.send("Hello World!");
+  res.send("Backend running");
 });
 
-server.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
