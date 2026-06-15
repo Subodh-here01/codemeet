@@ -1,3 +1,52 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Dark mode overrides for React Quill */
+.ql-toolbar.ql-snow {
+  background-color: #1e293b !important; /* slate-800 */
+  border: 1px solid #334155 !important; /* slate-700 */
+  border-top-left-radius: 0.75rem;
+  border-top-right-radius: 0.75rem;
+}
+.ql-container.ql-snow {
+  background-color: #0f172a !important; /* slate-900 */
+  border: 1px solid #334155 !important; /* slate-700 */
+  border-bottom-left-radius: 0.75rem;
+  border-bottom-right-radius: 0.75rem;
+  color: #f8fafc !important; /* slate-50 */
+  font-family: inherit;
+  height: calc(100% - 42px) !important;
+}
+.ql-editor {
+  font-size: 0.95rem;
+}
+.ql-snow .ql-stroke {
+  stroke: #94a3b8 !important; /* slate-400 */
+}
+.ql-snow .ql-fill {
+  fill: #94a3b8 !important; /* slate-400 */
+}
+.ql-snow .ql-picker {
+  color: #94a3b8 !important;
+}
+.ql-snow .ql-picker-options {
+  background-color: #1e293b !important;
+  border: 1px solid #334155 !important;
+}
+
+/* Custom modern scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}

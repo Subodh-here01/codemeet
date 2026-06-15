@@ -25,12 +25,15 @@ function Notepad({ socket, roomId }) {
   };
 
   return (
-    <ReactQuill
-      theme="snow"
-      value={value}
-      onChange={handleChange}
-      className="w-10/12 h-5/6 px-4 text-white"
-    />
+    <div className="flex-1 mx-2 h-full flex flex-col p-2">
+      <p className="text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Shared Interviewer Notes</p>
+      <ReactQuill
+        theme="snow"
+        value={value}
+        onChange={handleChange}
+        className="flex-1 text-slate-100 overflow-hidden"
+      />
+    </div>
   );
 }
 

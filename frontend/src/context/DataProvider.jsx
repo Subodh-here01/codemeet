@@ -26,7 +26,8 @@ export const DataProvider = ({ children }) => {
 
     const storedUser = localStorage.getItem("token");
     if (storedUser) {
-      setUser(storedUser);
+      const storedUsername = localStorage.getItem("username") || "User";
+      setUser(storedUsername);
     }
 
     const peer = new Peer();

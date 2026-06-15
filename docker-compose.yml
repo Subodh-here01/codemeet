@@ -1,4 +1,13 @@
 services:
+  piston:
+    image: ghcr.io/engineer-man/piston:latest
+    ports:
+      - "2000:2000"
+    restart: unless-stopped
+    volumes:
+      - piston-data:/piston
+    privileged: true
+
   backend:
     build: ./backend
     ports:
@@ -6,8 +15,11 @@ services:
     environment:
       MONGO_URI: "mongodb://host.docker.internal:27017/codemeet"
       PORT: "3000"
+      PISTON_URL: "http://piston:2000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      - piston
 
   frontend:
     build: ./frontend
@@ -15,3 +27,6 @@ services:
       - "5173:5173"
     depends_on:
       - backend
+
+volumes:
+  piston-data:
