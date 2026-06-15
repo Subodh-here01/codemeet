@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import connectdb from "./db/connectDb.js";
 import cookieParser from "cookie-parser";
 import auth from "./routes/auth.js";
+import execute from "./routes/execute.js"; // Real Piston executor (requires Docker)
 
 dotenv.config();
 
@@ -17,7 +18,7 @@ const server = createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: CLIENT_URL,
+    origin: [CLIENT_URL, "http://localhost:5174", "http://localhost:5173", "http://127.0.0.1:5173", "http://127.0.0.1:5174"],
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -29,7 +30,7 @@ app.use(cookieParser());
 
 app.use(
   cors({
-    origin: CLIENT_URL,
+    origin: [CLIENT_URL, "http://localhost:5174", "http://localhost:5173", "http://127.0.0.1:5173", "http://127.0.0.1:5174"],
     methods: ["GET", "POST"],
     credentials: true,
   })
@@ -38,6 +39,7 @@ app.use(
 connectdb();
 
 app.use("/api", auth);
+app.use("/api/execute", execute);
 
 io.on("connection", (socket) => {
   console.log(`User ${socket.id} connected`);

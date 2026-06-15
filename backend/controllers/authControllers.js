@@ -5,7 +5,10 @@ export const login = async (req, res) => {
     try {
         const { username, password } = req.body;
 
-        const user = await User.findOne({ username: username });
+        const trimmedUsername = (username || "").trim();
+        const user = await User.findOne({ 
+            username: { $regex: new RegExp("^" + trimmedUsername + "$", "i") } 
+        });
 
         if (user) {
             if (user.password === password) {
@@ -35,16 +38,31 @@ export const signup = async (req, res) => {
     try {
         const { name, email, username, password } = req.body;
 
-        const u = await User.findOne({ username: username });
+        const trimmedUsername = (username || "").trim();
+        const trimmedEmail = (email || "").trim().toLowerCase();
+
+        // Check if username exists
+        const u = await User.findOne({ 
+            username: { $regex: new RegExp("^" + trimmedUsername + "$", "i") } 
+        });
 
         if (u) {
-            return res.status(409).send("username already exists ");
+            return res.status(409).send("Username already exists");
+        }
+
+        // Check if email exists
+        const e = await User.findOne({ 
+            email: { $regex: new RegExp("^" + trimmedEmail + "$", "i") } 
+        });
+
+        if (e) {
+            return res.status(409).send("Email already exists");
         }
 
         const user = new User({
             name,
-            email,
-            username,
+            email: trimmedEmail,
+            username: trimmedUsername,
             password,
         });
 
@@ -53,6 +71,10 @@ export const signup = async (req, res) => {
         return res.status(201).send({ message: "user registered successfully", data: user });
     } catch (error) {
         console.log(error);
+        if (error.code === 11000) {
+            const field = Object.keys(error.keyValue)[0];
+            return res.status(409).send(`${field.charAt(0).toUpperCase() + field.slice(1)} already exists`);
+        }
         return res.status(500).send("internal server error");
     }
 }
