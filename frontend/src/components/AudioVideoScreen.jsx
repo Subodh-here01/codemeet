@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef } from "react";
+import { useContext, useEffect, useRef } from "react";
 import Peer from "peerjs";
 import { DataContext } from "../context/DataProvider";
 import Notepad from "./Notepad";
@@ -10,72 +10,102 @@ function AudioVideoScreen() {
   const currentUserVideoRef = useRef(null);
 
   useEffect(() => {
+    if (!socket) return;
+
     socket.on("connect", () => {
       console.log("connected", socket.id);
     });
 
     socket.emit("joinRoom", roomId);
-    const getUserMedia =
-      navigator.mediaDevices.getUserMedia ||
-      navigator.webkitGetUserMedia ||
-      navigator.mozGetUserMedia;
 
     if (!peerInstance.current) {
-      peerInstance.current = new Peer(); 
+      peerInstance.current = new Peer();
     }
 
-    peerInstance.current.on("call", (call) => {
-      getUserMedia({ video: true, audio: true })
-        .then((mediaStream) => {
-          currentUserVideoRef.current.srcObject = mediaStream;
-          currentUserVideoRef.current.play();
+    let localStream = null;
 
-          call.answer(mediaStream);
-
-          call.on("stream", (remoteStream) => {
-            remoteVideoRef.current.srcObject = remoteStream;
-            remoteVideoRef.current.play();
-          });
-        })
-        .catch((err) => {
-          console.error("Failed to get local stream", err);
-        });
-    });
-
-    if (status === "interviewee") {
-      call(roomId);
-    }
-
-    return () => {
-      if (peerInstance.current) {
-        peerInstance.current.destroy();
-        peerInstance.current = null;
-      }
-    };
-  }, [roomId, status]);
-
-  const call = (remotePeerId) => {
-    const getUserMedia =
-      navigator.mediaDevices.getUserMedia ||
-      navigator.webkitGetUserMedia ||
-      navigator.mozGetUserMedia;
-
-    getUserMedia({ video: true, audio: true })
+    // Request local camera and microphone stream immediately on mount for both roles
+    navigator.mediaDevices
+      .getUserMedia({ video: true, audio: true })
       .then((mediaStream) => {
-        currentUserVideoRef.current.srcObject = mediaStream;
-        currentUserVideoRef.current.play();
+        localStream = mediaStream;
+        if (currentUserVideoRef.current) {
+          currentUserVideoRef.current.srcObject = mediaStream;
+          currentUserVideoRef.current.play().catch((err) => {
+            console.error("Error playing local video:", err);
+          });
+        }
 
-        const call = peerInstance.current.call(remotePeerId, mediaStream);
-
-        call.on("stream", (remoteStream) => {
-          remoteVideoRef.current.srcObject = remoteStream;
-          remoteVideoRef.current.play();
-        });
+        // If this user is the interviewee, initiate the call to the interviewer (roomId)
+        if (status === "interviewee") {
+          const call = peerInstance.current.call(roomId, mediaStream);
+          call.on("stream", (remoteStream) => {
+            if (remoteVideoRef.current) {
+              remoteVideoRef.current.srcObject = remoteStream;
+              remoteVideoRef.current.play().catch((err) => {
+                console.error("Error playing remote video:", err);
+              });
+            }
+          });
+        }
       })
       .catch((err) => {
         console.error("Failed to get local stream", err);
       });
-  };
+
+    // Listen for incoming calls (interviewer answers interviewee)
+    const handleIncomingCall = (incomingCall) => {
+      if (localStream) {
+        incomingCall.answer(localStream);
+        incomingCall.on("stream", (remoteStream) => {
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = remoteStream;
+            remoteVideoRef.current.play().catch((err) => {
+              console.error("Error playing remote video:", err);
+            });
+          }
+        });
+      } else {
+        // Fallback: if local stream wasn't ready yet, request it and answer
+        navigator.mediaDevices
+          .getUserMedia({ video: true, audio: true })
+          .then((mediaStream) => {
+            localStream = mediaStream;
+            if (currentUserVideoRef.current) {
+              currentUserVideoRef.current.srcObject = mediaStream;
+              currentUserVideoRef.current.play().catch((err) => {
+                console.error("Error playing local video:", err);
+              });
+            }
+            incomingCall.answer(mediaStream);
+            incomingCall.on("stream", (remoteStream) => {
+              if (remoteVideoRef.current) {
+                remoteVideoRef.current.srcObject = remoteStream;
+                remoteVideoRef.current.play().catch((err) => {
+                  console.error("Error playing remote video:", err);
+                });
+              }
+            });
+          })
+          .catch((err) => {
+            console.error("Failed to get local stream during incoming call:", err);
+          });
+      }
+    };
+
+    peerInstance.current.on("call", handleIncomingCall);
+
+    return () => {
+      if (localStream) {
+        localStream.getTracks().forEach((track) => track.stop());
+      }
+      if (peerInstance.current) {
+        peerInstance.current.off("call", handleIncomingCall);
+        peerInstance.current.destroy();
+        peerInstance.current = null;
+      }
+    };
+  }, [roomId, status, peerInstance, socket]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 flex flex-col">
@@ -104,7 +134,7 @@ function AudioVideoScreen() {
               {status}
             </span>
           </div>
-          <button 
+          <button
             onClick={() => window.location.href = '/'}
             className="text-xs font-bold text-slate-400 hover:text-white bg-slate-900/50 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-900/50 px-4 py-2 rounded-xl transition-all shadow-sm active:scale-95"
           >
