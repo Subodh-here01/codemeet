@@ -49,6 +49,11 @@ io.on("connection", (socket) => {
     console.log(`User ${socket.id} joined room ${room}`);
   });
 
+  socket.on("peer-ready", ({ room, peerId, status }) => {
+    socket.to(room).emit("peer-ready", { peerId, status });
+    console.log(`Peer ready in room ${room}: ${status} (${peerId})`);
+  });
+
   socket.on("leaveRoom", (room) => {
     socket.leave(room);
     console.log(`User ${socket.id} left room ${room}`);

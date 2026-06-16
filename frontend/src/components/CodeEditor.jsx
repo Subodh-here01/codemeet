@@ -35,7 +35,9 @@ function CodeEditor({ socket, roomId }) {
     });
 
     return () => {
-      socket.disconnect();
+      socket.off("recieve-message");
+      socket.off("recieve-language");
+      socket.off("welcome");
     };
   }, []);
 

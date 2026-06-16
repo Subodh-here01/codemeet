@@ -14,8 +14,7 @@ function Notepad({ socket, roomId }) {
     });
 
     return () => {
-      socket.emit("leaveRoom", roomId);
-      socket.disconnect();
+      socket.off("recieve-text");
     };
   }, [roomId]);
 

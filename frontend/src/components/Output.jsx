@@ -83,7 +83,8 @@ function Output({ language, version, value, socket, roomId }) {
     });
 
     return () => {
-      socket.off("receive-input");
+      socket.off("recieve-input");
+      socket.off("recieve-output");
     };
   }, [socket]);
 

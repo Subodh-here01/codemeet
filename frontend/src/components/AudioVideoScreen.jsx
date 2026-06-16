@@ -10,6 +10,7 @@ function AudioVideoScreen() {
   const currentUserVideoRef = useRef(null);
   const localStreamRef = useRef(null);
   const activeCallRef = useRef(null);
+  const localStreamPromiseRef = useRef(null);
 
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
@@ -105,14 +106,36 @@ function AudioVideoScreen() {
     socket.emit("joinRoom", roomId);
 
     if (!peerInstance.current || peerInstance.current.destroyed) {
-      const peer = new Peer();
+      const peer = new Peer(undefined, {
+        config: {
+          iceServers: [
+            { urls: "stun:openrelay.metered.ca:80" },
+            {
+              urls: "turn:openrelay.metered.ca:80",
+              username: "openrelayproject",
+              credential: "openrelayproject",
+            },
+            {
+              urls: "turn:openrelay.metered.ca:443",
+              username: "openrelayproject",
+              credential: "openrelayproject",
+            },
+            {
+              urls: "turn:openrelay.metered.ca:443?transport=tcp",
+              username: "openrelayproject",
+              credential: "openrelayproject",
+            },
+          ],
+        },
+      });
       peer.on("open", (id) => {
         setPeerId(id);
       });
+      peer.on("error", (err) => {
+        console.error("AudioVideoScreen PeerJS error:", err);
+      });
       peerInstance.current = peer;
     }
-
-    let localStream = null;
 
     const getLocalStream = async () => {
       try {
@@ -137,7 +160,6 @@ function AudioVideoScreen() {
           }
         }
 
-        localStream = mediaStream;
         localStreamRef.current = mediaStream;
         setStreamError("");
 
@@ -156,101 +178,95 @@ function AudioVideoScreen() {
           });
         }
 
-        // If this user is the interviewee, initiate the call to the interviewer (roomId)
-        if (status === "interviewee") {
-          const call = peerInstance.current.call(roomId, mediaStream);
-          activeCallRef.current = call;
-          call.on("stream", (remoteStream) => {
-            if (remoteVideoRef.current) {
-              remoteVideoRef.current.srcObject = remoteStream;
-              remoteVideoRef.current.play().catch((err) => {
-                console.error("Error playing remote video:", err);
-              });
-            }
+        // Notify other peer that we are ready
+        if (peerInstance.current && peerInstance.current.id) {
+          socket.emit("peer-ready", {
+            room: roomId,
+            peerId: peerInstance.current.id,
+            status,
           });
         }
+
+        // If this user is the interviewee, initiate the call to the interviewer (roomId)
+        if (status === "interviewee") {
+          initiateCall(roomId, mediaStream);
+        }
+
+        return mediaStream;
       } catch (err) {
         console.error("Failed to get local stream:", err);
         setStreamError(err.message || "Failed to access camera/microphone.");
         
         // Even if local stream fails, if we are interviewee, we should still try to call the peer
-        // so that the connection is established for notepad and video from their side
         if (status === "interviewee") {
-          try {
-            const call = peerInstance.current.call(roomId, new MediaStream());
-            activeCallRef.current = call;
-            call.on("stream", (remoteStream) => {
-              if (remoteVideoRef.current) {
-                remoteVideoRef.current.srcObject = remoteStream;
-                remoteVideoRef.current.play().catch((err) => {
-                  console.error("Error playing remote video:", err);
-                });
-              }
-            });
-          } catch (callErr) {
-            console.error("Failed to call peer with empty stream:", callErr);
-          }
+          initiateCall(roomId, new MediaStream());
         }
+        return null;
       }
     };
 
-    getLocalStream();
+    const initiateCall = (targetPeerId, stream) => {
+      try {
+        if (activeCallRef.current) {
+          console.log("Closing existing call before initiating new call");
+          activeCallRef.current.close();
+        }
+
+        console.log(`Calling peer: ${targetPeerId}`);
+        const call = peerInstance.current.call(targetPeerId, stream);
+        activeCallRef.current = call;
+
+        call.on("stream", (remoteStream) => {
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = remoteStream;
+            remoteVideoRef.current.play().catch((err) => {
+              console.error("Error playing remote video:", err);
+            });
+          }
+        });
+
+        call.on("error", (err) => {
+          console.error("Call error:", err);
+        });
+      } catch (err) {
+        console.error("Failed to initiate call:", err);
+      }
+    };
+
+    // Listen for peer-ready signaling (in case the other peer joined after or reconnected)
+    const handlePeerReady = async ({ peerId: readyPeerId, status: readyStatus }) => {
+      console.log(`Peer ready event received: ${readyStatus} (${readyPeerId})`);
+      
+      // If we are interviewee and the interviewer becomes ready, call them
+      if (status === "interviewee" && readyStatus === "interviewer") {
+        let stream = localStreamRef.current;
+        if (!stream && localStreamPromiseRef.current) {
+          stream = await localStreamPromiseRef.current;
+        }
+        initiateCall(readyPeerId, stream || new MediaStream());
+      }
+    };
+
+    socket.on("peer-ready", handlePeerReady);
 
     // Listen for incoming calls (interviewer answers interviewee)
     const handleIncomingCall = async (incomingCall) => {
+      console.log("Receiving incoming call...");
+      if (activeCallRef.current) {
+        console.log("Closing existing call to answer new incoming call");
+        activeCallRef.current.close();
+      }
       activeCallRef.current = incomingCall;
-      if (localStream) {
-        incomingCall.answer(localStream);
-        incomingCall.on("stream", (remoteStream) => {
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = remoteStream;
-            remoteVideoRef.current.play().catch((err) => {
-              console.error("Error playing remote video:", err);
-            });
-          }
-        });
-      } else {
-        // Fallback: if local stream wasn't ready yet, request it and answer
-        try {
-          let mediaStream = null;
-          try {
-            mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-          } catch (err) {
-            try {
-              mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-            } catch (err2) {
-              try {
-                mediaStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-                setIsVideoOff(true);
-              } catch (err3) {
-                throw new Error("Could not access camera/mic.");
-              }
-            }
-          }
-          localStream = mediaStream;
-          localStreamRef.current = mediaStream;
-          setStreamError("");
 
-          mediaStream.getAudioTracks().forEach((track) => {
-            track.enabled = !isMuted;
-          });
-          mediaStream.getVideoTracks().forEach((track) => {
-            track.enabled = !isVideoOff;
-          });
-
-          if (currentUserVideoRef.current) {
-            currentUserVideoRef.current.srcObject = mediaStream;
-            currentUserVideoRef.current.play().catch((err) => {
-              console.error("Error playing local video:", err);
-            });
-          }
-          incomingCall.answer(mediaStream);
-        } catch (err) {
-          console.error("Failed to get stream during incoming call:", err);
-          setStreamError(err.message || "Failed to access camera/microphone.");
-          incomingCall.answer(new MediaStream());
+      try {
+        let stream = localStreamRef.current;
+        if (!stream && localStreamPromiseRef.current) {
+          console.log("Waiting for local stream before answering call...");
+          stream = await localStreamPromiseRef.current;
         }
-
+        
+        incomingCall.answer(stream || new MediaStream());
+        
         incomingCall.on("stream", (remoteStream) => {
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = remoteStream;
@@ -259,20 +275,41 @@ function AudioVideoScreen() {
             });
           }
         });
+      } catch (err) {
+        console.error("Error answering incoming call:", err);
+        incomingCall.answer(new MediaStream());
       }
     };
 
     peerInstance.current.on("call", handleIncomingCall);
 
+    // Also handle peer open event to emit peer-ready if getLocalStream already completed
+    const handlePeerOpen = (id) => {
+      setPeerId(id);
+      if (localStreamRef.current) {
+        socket.emit("peer-ready", {
+          room: roomId,
+          peerId: id,
+          status,
+        });
+      }
+    };
+    peerInstance.current.on("open", handlePeerOpen);
+
+    // Start fetching local stream
+    localStreamPromiseRef.current = getLocalStream();
+
     return () => {
-      if (localStream) {
-        localStream.getTracks().forEach((track) => track.stop());
+      socket.off("peer-ready", handlePeerReady);
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((track) => track.stop());
       }
       if (activeCallRef.current) {
         activeCallRef.current.close();
       }
       if (peerInstance.current) {
         peerInstance.current.off("call", handleIncomingCall);
+        peerInstance.current.off("open", handlePeerOpen);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
