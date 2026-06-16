@@ -50,6 +50,7 @@ export const DataProvider = ({ children }) => {
         setRoomId,
         peerInstance,
         peerId,
+        setPeerId,
         socket,
       }}
     >

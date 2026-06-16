@@ -1,13 +1,99 @@
-import { useContext, useEffect, useRef } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import Peer from "peerjs";
 import { DataContext } from "../context/DataProvider";
 import Notepad from "./Notepad";
 import CodeEditor from "./CodeEditor";
 
 function AudioVideoScreen() {
-  const { roomId, peerInstance, status, socket } = useContext(DataContext);
+  const { roomId, peerInstance, status, socket, setPeerId } = useContext(DataContext);
   const remoteVideoRef = useRef(null);
   const currentUserVideoRef = useRef(null);
+  const localStreamRef = useRef(null);
+  const activeCallRef = useRef(null);
+
+  const [isMuted, setIsMuted] = useState(false);
+  const [isVideoOff, setIsVideoOff] = useState(false);
+  const [streamError, setStreamError] = useState("");
+
+  const toggleMute = () => {
+    if (localStreamRef.current) {
+      const audioTracks = localStreamRef.current.getAudioTracks();
+      audioTracks.forEach((track) => {
+        track.enabled = !track.enabled;
+      });
+      setIsMuted(!audioTracks[0]?.enabled);
+    }
+  };
+
+  const toggleVideo = async () => {
+    if (localStreamRef.current) {
+      const videoTracks = localStreamRef.current.getVideoTracks();
+      
+      if (videoTracks.length > 0 && !isVideoOff) {
+        // Turning video OFF: Stop the track to turn off the hardware light
+        const track = videoTracks[0];
+        track.stop();
+        
+        // Remove track from local stream to stop rendering locally
+        localStreamRef.current.removeTrack(track);
+        
+        // Replace track with null on the WebRTC sender so the remote peer sees black screen
+        if (activeCallRef.current && activeCallRef.current.peerConnection) {
+          try {
+            const senders = activeCallRef.current.peerConnection.getSenders();
+            const videoSender = senders.find(sender => sender.track && sender.track.kind === 'video');
+            if (videoSender) {
+              await videoSender.replaceTrack(null);
+            }
+          } catch (err) {
+            console.error("Error replacing track with null:", err);
+          }
+        }
+        
+        setIsVideoOff(true);
+      } else {
+        // Turning video ON: Re-acquire video stream from camera
+        try {
+          const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          const newTrack = tempStream.getVideoTracks()[0];
+          
+          // Remove any existing video tracks first
+          localStreamRef.current.getVideoTracks().forEach((t) => {
+            t.stop();
+            localStreamRef.current.removeTrack(t);
+          });
+          
+          // Add new track to the local stream
+          localStreamRef.current.addTrack(newTrack);
+          
+          // Replace track on the WebRTC sender so the remote peer receives the new stream
+          if (activeCallRef.current && activeCallRef.current.peerConnection) {
+            try {
+              const senders = activeCallRef.current.peerConnection.getSenders();
+              const videoSender = senders.find(sender => sender.track && sender.track.kind === 'video');
+              if (videoSender) {
+                await videoSender.replaceTrack(newTrack);
+              }
+            } catch (err) {
+              console.error("Error replacing track with new track:", err);
+            }
+          }
+          
+          // Re-bind source object to trigger update in video player
+          if (currentUserVideoRef.current) {
+            currentUserVideoRef.current.srcObject = localStreamRef.current;
+            currentUserVideoRef.current.play().catch((err) => {
+              console.error("Error playing local video:", err);
+            });
+          }
+          
+          setIsVideoOff(false);
+        } catch (err) {
+          console.error("Failed to re-acquire camera stream:", err);
+        }
+      }
+    }
+  };
 
   useEffect(() => {
     if (!socket) return;
@@ -18,17 +104,51 @@ function AudioVideoScreen() {
 
     socket.emit("joinRoom", roomId);
 
-    if (!peerInstance.current) {
-      peerInstance.current = new Peer();
+    if (!peerInstance.current || peerInstance.current.destroyed) {
+      const peer = new Peer();
+      peer.on("open", (id) => {
+        setPeerId(id);
+      });
+      peerInstance.current = peer;
     }
 
     let localStream = null;
 
-    // Request local camera and microphone stream immediately on mount for both roles
-    navigator.mediaDevices
-      .getUserMedia({ video: true, audio: true })
-      .then((mediaStream) => {
+    const getLocalStream = async () => {
+      try {
+        let mediaStream = null;
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        } catch (err) {
+          console.warn("Failed to get video and audio, trying video-only...", err);
+          try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          } catch (err2) {
+            console.warn("Failed to get video-only, trying audio-only...", err2);
+            try {
+              mediaStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+              setIsVideoOff(true);
+            } catch (err3) {
+              if (err.name === "NotReadableError" || err.message?.includes("Could not start video source")) {
+                throw new Error("Webcam is locked by another window/app (exclusive lock on Linux). Try turning off the camera in the other tab first.");
+              }
+              throw new Error("Could not access camera or microphone. Please check your browser permissions.");
+            }
+          }
+        }
+
         localStream = mediaStream;
+        localStreamRef.current = mediaStream;
+        setStreamError("");
+
+        // Apply pre-existing mute/video state
+        mediaStream.getAudioTracks().forEach((track) => {
+          track.enabled = !isMuted;
+        });
+        mediaStream.getVideoTracks().forEach((track) => {
+          track.enabled = !isVideoOff;
+        });
+
         if (currentUserVideoRef.current) {
           currentUserVideoRef.current.srcObject = mediaStream;
           currentUserVideoRef.current.play().catch((err) => {
@@ -39,6 +159,7 @@ function AudioVideoScreen() {
         // If this user is the interviewee, initiate the call to the interviewer (roomId)
         if (status === "interviewee") {
           const call = peerInstance.current.call(roomId, mediaStream);
+          activeCallRef.current = call;
           call.on("stream", (remoteStream) => {
             if (remoteVideoRef.current) {
               remoteVideoRef.current.srcObject = remoteStream;
@@ -48,13 +169,36 @@ function AudioVideoScreen() {
             }
           });
         }
-      })
-      .catch((err) => {
-        console.error("Failed to get local stream", err);
-      });
+      } catch (err) {
+        console.error("Failed to get local stream:", err);
+        setStreamError(err.message || "Failed to access camera/microphone.");
+        
+        // Even if local stream fails, if we are interviewee, we should still try to call the peer
+        // so that the connection is established for notepad and video from their side
+        if (status === "interviewee") {
+          try {
+            const call = peerInstance.current.call(roomId, new MediaStream());
+            activeCallRef.current = call;
+            call.on("stream", (remoteStream) => {
+              if (remoteVideoRef.current) {
+                remoteVideoRef.current.srcObject = remoteStream;
+                remoteVideoRef.current.play().catch((err) => {
+                  console.error("Error playing remote video:", err);
+                });
+              }
+            });
+          } catch (callErr) {
+            console.error("Failed to call peer with empty stream:", callErr);
+          }
+        }
+      }
+    };
+
+    getLocalStream();
 
     // Listen for incoming calls (interviewer answers interviewee)
-    const handleIncomingCall = (incomingCall) => {
+    const handleIncomingCall = async (incomingCall) => {
+      activeCallRef.current = incomingCall;
       if (localStream) {
         incomingCall.answer(localStream);
         incomingCall.on("stream", (remoteStream) => {
@@ -67,29 +211,54 @@ function AudioVideoScreen() {
         });
       } else {
         // Fallback: if local stream wasn't ready yet, request it and answer
-        navigator.mediaDevices
-          .getUserMedia({ video: true, audio: true })
-          .then((mediaStream) => {
-            localStream = mediaStream;
-            if (currentUserVideoRef.current) {
-              currentUserVideoRef.current.srcObject = mediaStream;
-              currentUserVideoRef.current.play().catch((err) => {
-                console.error("Error playing local video:", err);
-              });
-            }
-            incomingCall.answer(mediaStream);
-            incomingCall.on("stream", (remoteStream) => {
-              if (remoteVideoRef.current) {
-                remoteVideoRef.current.srcObject = remoteStream;
-                remoteVideoRef.current.play().catch((err) => {
-                  console.error("Error playing remote video:", err);
-                });
+        try {
+          let mediaStream = null;
+          try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          } catch (err) {
+            try {
+              mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            } catch (err2) {
+              try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+                setIsVideoOff(true);
+              } catch (err3) {
+                throw new Error("Could not access camera/mic.");
               }
-            });
-          })
-          .catch((err) => {
-            console.error("Failed to get local stream during incoming call:", err);
+            }
+          }
+          localStream = mediaStream;
+          localStreamRef.current = mediaStream;
+          setStreamError("");
+
+          mediaStream.getAudioTracks().forEach((track) => {
+            track.enabled = !isMuted;
           });
+          mediaStream.getVideoTracks().forEach((track) => {
+            track.enabled = !isVideoOff;
+          });
+
+          if (currentUserVideoRef.current) {
+            currentUserVideoRef.current.srcObject = mediaStream;
+            currentUserVideoRef.current.play().catch((err) => {
+              console.error("Error playing local video:", err);
+            });
+          }
+          incomingCall.answer(mediaStream);
+        } catch (err) {
+          console.error("Failed to get stream during incoming call:", err);
+          setStreamError(err.message || "Failed to access camera/microphone.");
+          incomingCall.answer(new MediaStream());
+        }
+
+        incomingCall.on("stream", (remoteStream) => {
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = remoteStream;
+            remoteVideoRef.current.play().catch((err) => {
+              console.error("Error playing remote video:", err);
+            });
+          }
+        });
       }
     };
 
@@ -99,13 +268,15 @@ function AudioVideoScreen() {
       if (localStream) {
         localStream.getTracks().forEach((track) => track.stop());
       }
+      if (activeCallRef.current) {
+        activeCallRef.current.close();
+      }
       if (peerInstance.current) {
         peerInstance.current.off("call", handleIncomingCall);
-        peerInstance.current.destroy();
-        peerInstance.current = null;
       }
     };
-  }, [roomId, status, peerInstance, socket]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId, status, peerInstance, socket, setPeerId]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 flex flex-col">
@@ -158,9 +329,91 @@ function AudioVideoScreen() {
                 muted
                 className="w-full h-full object-cover scale-x-[-1]"
               />
+              
+              {/* Stream Error Overlay */}
+              {streamError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/95 p-4 text-center z-10">
+                  <div className="w-12 h-12 rounded-full bg-rose-950/50 flex items-center justify-center border border-rose-900/40 text-rose-400 mb-2">
+                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <span className="text-xs text-rose-400 font-bold tracking-wide uppercase mb-1">Stream Error</span>
+                  <p className="text-[10px] text-slate-400 max-w-[200px] leading-relaxed">{streamError}</p>
+                </div>
+              )}
+
+              {/* Camera Off Overlay */}
+              {!streamError && isVideoOff && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 z-10">
+                  <div className="w-12 h-12 rounded-full bg-slate-900 flex items-center justify-center border border-slate-800 text-slate-500 mb-2">
+                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2" />
+                      <path d="M10.68 10.68a2 2 0 0 1-2.83-2.83" />
+                      <path d="m22 8-6 4 6 4V8Z" />
+                      <line x1="2" x2="22" y1="2" y2="22" />
+                    </svg>
+                  </div>
+                  <span className="text-xs text-slate-500 font-semibold tracking-wide uppercase">Camera is off</span>
+                </div>
+              )}
+
               {/* Overlay Badge */}
-              <div className="absolute bottom-3 left-3 bg-slate-950/80 backdrop-blur-md border border-slate-800/60 text-[10px] font-bold text-slate-200 px-2.5 py-1 rounded-full uppercase tracking-wider">
+              <div className="absolute bottom-3 left-3 bg-slate-950/80 backdrop-blur-md border border-slate-800/60 text-[10px] font-bold text-slate-200 px-2.5 py-1 rounded-full uppercase tracking-wider z-20">
                 You (Local)
+              </div>
+
+              {/* Controls overlay */}
+              <div className="absolute bottom-3 right-3 flex items-center gap-2 z-20">
+                <button
+                  onClick={toggleMute}
+                  className={`p-2 rounded-xl border transition-all active:scale-95 ${
+                    isMuted
+                      ? "bg-rose-500/25 border-rose-500/40 text-rose-400 hover:bg-rose-500/35"
+                      : "bg-slate-900/90 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white"
+                  }`}
+                  title={isMuted ? "Unmute Microphone" : "Mute Microphone"}
+                >
+                  {isMuted ? (
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="1" x2="23" y1="1" y2="23" />
+                      <path d="M9 9v3a3 3 0 0 0 5.12 2.12" />
+                      <path d="M15 9.34V5a3 3 0 0 0-5.94-.6" />
+                      <path d="M17 14.89A7.12 7.12 0 0 0 19 11v-1" />
+                      <path d="M5 10v1a7 7 0 0 0 8 6.92" />
+                      <line x1="12" x2="12" y1="19" y2="22" />
+                    </svg>
+                  ) : (
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                      <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+                      <line x1="12" x2="12" y1="19" y2="22" />
+                    </svg>
+                  )}
+                </button>
+                <button
+                  onClick={toggleVideo}
+                  className={`p-2 rounded-xl border transition-all active:scale-95 ${
+                    isVideoOff
+                      ? "bg-rose-500/25 border-rose-500/40 text-rose-400 hover:bg-rose-500/35"
+                      : "bg-slate-900/90 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white"
+                  }`}
+                  title={isVideoOff ? "Turn Camera On" : "Turn Camera Off"}
+                >
+                  {isVideoOff ? (
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2" />
+                      <path d="M10.68 10.68a2 2 0 0 1-2.83-2.83" />
+                      <path d="m22 8-6 4 6 4V8Z" />
+                      <line x1="2" x2="22" y1="2" y2="22" />
+                    </svg>
+                  ) : (
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m22 8-6 4 6 4V8Z" />
+                      <rect x="2" y="6" width="14" height="12" rx="2" ry="2" />
+                    </svg>
+                  )}
+                </button>
               </div>
             </div>
           </div>
