@@ -1,11 +1,13 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import Peer from "peerjs";
 import { DataContext } from "../context/DataProvider";
+import { useNavigate } from "react-router-dom";
 import Notepad from "./Notepad";
 import CodeEditor from "./CodeEditor";
 
 function AudioVideoScreen() {
   const { roomId, peerInstance, status, socket, setPeerId } = useContext(DataContext);
+  const navigate = useNavigate();
   const remoteVideoRef = useRef(null);
   const currentUserVideoRef = useRef(null);
   const localStreamRef = useRef(null);
@@ -343,7 +345,7 @@ function AudioVideoScreen() {
             </span>
           </div>
           <button
-            onClick={() => window.location.href = '/'}
+            onClick={() => navigate('/')}
             className="text-xs font-bold text-slate-400 hover:text-white bg-slate-900/50 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-900/50 px-4 py-2 rounded-xl transition-all shadow-sm active:scale-95"
           >
             Leave Room

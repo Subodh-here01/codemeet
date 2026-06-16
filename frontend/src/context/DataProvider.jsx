@@ -10,7 +10,13 @@ import { io } from "socket.io-client";
 export const DataContext = createContext();
 
 export const DataProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      return localStorage.getItem("username") || "User";
+    }
+    return null;
+  });
   const [socket, setSocket] = useState(null);
   const [status, setStatus] = useState("");
   const [roomId, setRoomId] = useState("");
@@ -23,12 +29,6 @@ export const DataProvider = ({ children }) => {
     });
 
     setSocket(socket);
-
-    const storedUser = localStorage.getItem("token");
-    if (storedUser) {
-      const storedUsername = localStorage.getItem("username") || "User";
-      setUser(storedUsername);
-    }
 
     const peer = new Peer(undefined, {
       config: {

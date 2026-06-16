@@ -21,6 +21,8 @@ function CodeEditor({ socket, roomId }) {
   }
 
   useEffect(() => {
+    if (!socket) return;
+
     socket.on("recieve-message", (data) => {
       setValue(data);
     });
@@ -39,7 +41,7 @@ function CodeEditor({ socket, roomId }) {
       socket.off("recieve-language");
       socket.off("welcome");
     };
-  }, []);
+  }, [socket, roomId]);
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 px-12 pb-12 mt-6">

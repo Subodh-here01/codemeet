@@ -7,7 +7,7 @@ function Notepad({ socket, roomId }) {
   const [value, setValue] = useState("");
 
   useEffect(() => {
-    // socket.emit("joinRoom", roomId);
+    if (!socket) return;
 
     socket.on("recieve-text", (data) => {
       setValue(data);
@@ -16,7 +16,7 @@ function Notepad({ socket, roomId }) {
     return () => {
       socket.off("recieve-text");
     };
-  }, [roomId]);
+  }, [roomId, socket]);
 
   const handleChange = (newValue) => {
     setValue(newValue);

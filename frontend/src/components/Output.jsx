@@ -74,6 +74,8 @@ function Output({ language, version, value, socket, roomId }) {
   }
 
   useEffect(() => {
+    if (!socket) return;
+
     socket.on("recieve-input", (data) => {
       setInput(data);
     });
@@ -86,7 +88,7 @@ function Output({ language, version, value, socket, roomId }) {
       socket.off("recieve-input");
       socket.off("recieve-output");
     };
-  }, [socket]);
+  }, [socket, roomId]);
 
   return (
     <div className="flex flex-col w-full py-4 px-2">
