@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700">
+  <rect width="1200" height="700" fill="#0f172a"/>
+  <circle cx="250" cy="180" r="70" fill="#38bdf8"/>
+  <circle cx="950" cy="180" r="70" fill="#38bdf8"/>
+  <rect x="250" y="250" width="700" height="220" rx="28" fill="#1e293b" stroke="#38bdf8" stroke-width="4"/>
+  <path d="M320 360 L420 300 L420 420 Z" fill="#38bdf8"/>
+  <path d="M880 360 L780 300 L780 420 Z" fill="#38bdf8"/>
+  <line x1="420" y1="360" x2="780" y2="360" stroke="#38bdf8" stroke-width="10" stroke-dasharray="20,15"/>
+  <text x="600" y="570" text-anchor="middle" font-size="80" font-family="Arial, sans-serif" fill="#ffffff" font-weight="bold">
+    CodeMeet
+  </text>
+  <text x="600" y="630" text-anchor="middle" font-size="28" font-family="Arial, sans-serif" fill="#cbd5e1">
+    Connect • Collaborate • Code
+  </text>
+</svg>

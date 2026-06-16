@@ -48,16 +48,12 @@ function Login() {
       <div className="w-full max-w-md bg-slate-900/50 border border-slate-800/80 rounded-2xl p-8 shadow-2xl backdrop-blur-md flex flex-col items-center">
         {/* Logo */}
         <div className="flex items-center gap-3 mb-6">
-          <div className="bg-gradient-to-tr from-blue-600 to-indigo-600 p-2.5 rounded-xl shadow-lg shadow-blue-500/25">
-            <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
+          <img src="/codemeet_logo.svg" alt="CodeMeet Logo" className="h-9 w-9 rounded-lg shadow-sm object-contain" />
           <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">CodeMeet</h1>
         </div>
 
         <h2 className="text-xl font-semibold text-slate-200 mb-6 uppercase tracking-wider text-center">Welcome Back</h2>
-        
+
         {error && (
           <div className="w-full bg-rose-950/40 border border-rose-900/50 text-rose-300 px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider mb-4 text-center">
             {error}

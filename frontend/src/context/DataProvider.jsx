@@ -18,10 +18,30 @@ export const DataProvider = ({ children }) => {
     return null;
   });
   const [socket, setSocket] = useState(null);
-  const [status, setStatus] = useState("");
-  const [roomId, setRoomId] = useState("");
+  const [status, setStatus] = useState(() => {
+    return sessionStorage.getItem("meet_status") || "";
+  });
+  const [roomId, setRoomId] = useState(() => {
+    return sessionStorage.getItem("meet_roomId") || "";
+  });
   const [peerId, setPeerId] = useState("");
   const peerInstance = useRef(null);
+
+  useEffect(() => {
+    if (status === "") {
+      sessionStorage.removeItem("meet_status");
+    } else {
+      sessionStorage.setItem("meet_status", status);
+    }
+  }, [status]);
+
+  useEffect(() => {
+    if (roomId === "") {
+      sessionStorage.removeItem("meet_roomId");
+    } else {
+      sessionStorage.setItem("meet_roomId", roomId);
+    }
+  }, [roomId]);
 
   useEffect(() => {
     const socket = io(import.meta.env.VITE_SOCKET_URL, {
@@ -30,7 +50,11 @@ export const DataProvider = ({ children }) => {
 
     setSocket(socket);
 
-    const peer = new Peer(undefined, {
+    const savedStatus = sessionStorage.getItem("meet_status");
+    const savedRoomId = sessionStorage.getItem("meet_roomId");
+    const peerIdToUse = (savedStatus === "interviewer" && savedRoomId) ? savedRoomId : undefined;
+
+    const peer = new Peer(peerIdToUse, {
       config: {
         iceServers: [
           { urls: "stun:openrelay.metered.ca:80" },

@@ -2,24 +2,16 @@ import React from "react";
 import { languages } from "../constants.js";
 
 const LanguageDropdown = ({
-  langSetter,
-  verSetter,
-  socket,
+  onLanguageChange,
   lang,
   ver,
-  roomId,
 }) => {
   const handleChange = (event) => {
     const selectedLanguage = event.target.value;
     const selectedVersion = languages.find(
-      (lang) => lang.name === selectedLanguage
+      (l) => l.name === selectedLanguage
     ).version;
-    langSetter(selectedLanguage);
-    verSetter(selectedVersion);
-    socket.emit("change-language", {
-      room: roomId,
-      data: { language: selectedLanguage, version: selectedVersion },
-    });
+    onLanguageChange(selectedLanguage, selectedVersion);
   };
 
   return (

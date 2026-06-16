@@ -36,11 +36,7 @@ function Homepage() {
       {/* Navbar */}
       <nav className="flex px-12 py-5 justify-between items-center bg-slate-950/50 border-b border-slate-850 backdrop-blur-md sticky top-0 z-50">
         <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-tr from-blue-600 to-indigo-600 p-2 rounded-xl shadow-lg shadow-blue-500/20">
-            <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
+          <img src="/codemeet_logo.svg" alt="CodeMeet Logo" className="h-8 w-8 rounded-lg shadow-sm object-contain" />
           <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">codemeet</span>
         </div>
 
@@ -59,13 +55,13 @@ function Homepage() {
             </div>
           ) : (
             <div className="flex items-center gap-3">
-              <button 
+              <button
                 onClick={() => navigate("/login")}
                 className="text-xs font-bold text-slate-300 hover:text-white px-4 py-2.5 rounded-xl transition-all"
               >
                 Login
               </button>
-              <button 
+              <button
                 onClick={() => navigate("/signup")}
                 className="text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 px-4 py-2.5 rounded-xl shadow-lg shadow-blue-500/10 transition-all active:scale-95"
               >
@@ -228,11 +224,7 @@ function Homepage() {
         <div className="max-w-7xl mx-auto flex flex-wrap justify-between gap-10">
           <div className="w-full sm:w-1/4 mb-6 sm:mb-0 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="bg-gradient-to-tr from-blue-600 to-indigo-600 p-1.5 rounded-lg shadow-lg shadow-blue-500/10">
-                <svg className="h-4.5 w-4.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
+              <img src="/codemeet_logo.svg" alt="CodeMeet Logo" className="h-6 w-6 rounded-md shadow-sm object-contain" />
               <span className="text-base font-bold text-white tracking-wider">codemeet</span>
             </div>
             <p className="text-xs text-slate-500 leading-relaxed">

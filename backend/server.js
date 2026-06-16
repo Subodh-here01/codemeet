@@ -60,27 +60,43 @@ io.on("connection", (socket) => {
   });
 
   socket.on("message", ({ room, data }) => {
-    io.to(room).emit("recieve-message", data);
+    socket.to(room).emit("recieve-message", data);
   });
 
   socket.on("display-code", ({ room, data }) => {
-    io.to(room).emit("recieve-code", data);
+    socket.to(room).emit("recieve-code", data);
   });
 
   socket.on("input-change", ({ room, data }) => {
-    io.to(room).emit("recieve-input", data);
+    socket.to(room).emit("recieve-input", data);
   });
 
   socket.on("output-change", ({ room, data }) => {
-    io.to(room).emit("recieve-output", data);
+    socket.to(room).emit("recieve-output", data);
   });
 
   socket.on("change-language", ({ room, data }) => {
-    io.to(room).emit("recieve-language", data);
+    socket.to(room).emit("recieve-language", data);
   });
 
   socket.on("text-change", ({ room, data }) => {
-    io.to(room).emit("recieve-text", data);
+    socket.to(room).emit("recieve-text", data);
+  });
+
+  socket.on("request-code-sync", (room) => {
+    socket.to(room).emit("request-code-sync");
+  });
+
+  socket.on("sync-code", ({ room, code, language, version }) => {
+    socket.to(room).emit("sync-code", { code, language, version });
+  });
+
+  socket.on("request-notes-sync", (room) => {
+    socket.to(room).emit("request-notes-sync");
+  });
+
+  socket.on("sync-notes", ({ room, data }) => {
+    socket.to(room).emit("sync-notes", data);
   });
 
   socket.on("disconnect", () => {

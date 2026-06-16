@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
+import ReactDOM from "react-dom";
 
 function Output({ language, version, value, socket, roomId }) {
   const [output, setOutput] = useState("");
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showPrompt, setShowPrompt] = useState(false);
 
   // Map languages to Judge0 language IDs
   const languageMap = {
@@ -16,12 +18,38 @@ function Output({ language, version, value, socket, roomId }) {
     typescript: 74,
   };
 
-  const handleRun = async () => {
+  const requiresInput = (code, lang) => {
+    if (!code) return false;
+    const lowerCode = code.toLowerCase();
+    switch (lang) {
+      case "c":
+        return lowerCode.includes("scanf") || lowerCode.includes("getchar") || lowerCode.includes("gets") || lowerCode.includes("fgets");
+      case "cpp":
+        return lowerCode.includes("cin") || lowerCode.includes("getline");
+      case "java":
+        return lowerCode.includes("scanner") || lowerCode.includes("system.in") || lowerCode.includes("bufferedreader") || lowerCode.includes("readline");
+      case "python":
+        return lowerCode.includes("input(") || lowerCode.includes("sys.stdin");
+      case "javascript":
+      case "typescript":
+        return lowerCode.includes("prompt") || lowerCode.includes("readline");
+      default:
+        return false;
+    }
+  };
+
+  const handleRun = async (bypassPrompt = false) => {
     if (!value.trim()) {
       setOutput("Please write some code first");
       return;
     }
 
+    if (!bypassPrompt && requiresInput(value, language) && !input.trim()) {
+      setShowPrompt(true);
+      return;
+    }
+
+    setShowPrompt(false);
     setLoading(true);
     setError("");
     
@@ -142,6 +170,39 @@ function Output({ language, version, value, socket, roomId }) {
           </div>
         </div>
       </div>
+
+      {showPrompt && ReactDOM.createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-700/60 rounded-2xl p-6 shadow-2xl flex flex-col relative animate-in fade-in zoom-in duration-200">
+            <h3 className="text-base font-bold text-slate-100 mb-2">Input Required</h3>
+            <p className="text-xs text-slate-400 mb-4">
+              Your code contains input statements (e.g. scanf, cin, input). Please provide the standard input (stdin) for execution:
+            </p>
+            <textarea
+              className="h-28 w-full outline-none border border-slate-700 rounded-xl p-3 bg-slate-950 text-slate-100 placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none transition-all text-sm font-mono mb-4"
+              value={input}
+              onChange={handleChange}
+              placeholder="Enter stdin input here..."
+              autoFocus
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowPrompt(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 bg-slate-800 border border-slate-700 hover:text-white hover:bg-slate-700 active:scale-95 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleRun(true)}
+                className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 active:scale-95 shadow-lg shadow-blue-500/20 transition-all"
+              >
+                Run Code
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

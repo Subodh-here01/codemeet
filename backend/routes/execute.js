@@ -13,7 +13,7 @@ const languageMap = {
 
 router.post("/code", async (req, res) => {
   try {
-    const { language, version, code, input } = req.body;
+    const { language, code, input } = req.body;
 
     if (!code) {
       return res.status(400).json({ error: "No code provided" });
@@ -23,7 +23,7 @@ router.post("/code", async (req, res) => {
 
     const requestBody = {
       language: pistonLanguage,
-      version: version || "*",
+      version: "*", // Use wildcard to match any installed version on the runner
       files: [
         {
           content: code,
@@ -32,26 +32,39 @@ router.post("/code", async (req, res) => {
       stdin: input || "",
     };
 
-    // Use local Piston server (Docker) 
-    // When running in Docker: http://piston:2000
-    // When running locally: http://localhost:2000
-    const pistonHost = process.env.PISTON_URL || "http://localhost:2000";
-    const pistonApiUrl = `${pistonHost}/api/v2/execute`;
+    const localPistonHost = process.env.PISTON_URL || "http://localhost:2000";
+    const localPistonUrl = `${localPistonHost}/api/v2/execute`;
+    const publicPistonUrl = "https://emkc.org/api/v2/execute";
 
-    console.log("Executing code on Piston:", {
-      pistonApiUrl,
-      language: pistonLanguage,
-      codeLength: code.length,
-    });
+    let response;
+    let usedUrl = localPistonUrl;
 
-    const response = await fetch(pistonApiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-      timeout: 30000,
-    });
+    try {
+      console.log(`Attempting execution on local Piston: ${localPistonUrl}`);
+      response = await fetch(localPistonUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+        timeout: 5000,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Local Piston returned status ${response.status}`);
+      }
+    } catch (localErr) {
+      console.warn(`Local Piston execution failed (${localErr.message}). Falling back to public Piston API.`);
+      usedUrl = publicPistonUrl;
+      response = await fetch(publicPistonUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+        timeout: 25000,
+      });
+    }
 
     const data = await response.json();
 
@@ -72,6 +85,7 @@ router.post("/code", async (req, res) => {
       success: true,
       output: output || "(No output)",
       language: pistonLanguage,
+      usedUrl,
     });
   } catch (error) {
     console.error("Error in execute endpoint:", error);

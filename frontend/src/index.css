@@ -16,10 +16,14 @@
   border-bottom-right-radius: 0.75rem;
   color: #f8fafc !important; /* slate-50 */
   font-family: inherit;
-  height: calc(100% - 42px) !important;
+  height: 200px !important;
 }
 .ql-editor {
   font-size: 0.95rem;
+  white-space: pre-wrap !important;
+}
+.ql-expanded-notes .ql-container.ql-snow {
+  height: 52vh !important;
 }
 .ql-snow .ql-stroke {
   stroke: #94a3b8 !important; /* slate-400 */
@@ -49,4 +53,34 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #475569;
+}
+
+/* Heading styles for Quill editor content (overriding Tailwind Preflight) */
+.ql-editor h1 {
+  font-size: 2em !important;
+  font-weight: bold !important;
+  margin-top: 0.67em !important;
+  margin-bottom: 0.67em !important;
+}
+.ql-editor h2 {
+  font-size: 1.5em !important;
+  font-weight: bold !important;
+  margin-top: 0.83em !important;
+  margin-bottom: 0.83em !important;
+}
+.ql-editor h3 {
+  font-size: 1.17em !important;
+  font-weight: bold !important;
+  margin-top: 1em !important;
+  margin-bottom: 1em !important;
+}
+.ql-editor h4 {
+  font-size: 1em !important;
+  font-weight: bold !important;
+  margin-top: 1.33em !important;
+  margin-bottom: 1.33em !important;
+}
+.ql-editor p {
+  margin-top: 0.5em !important;
+  margin-bottom: 0.5em !important;
 }
