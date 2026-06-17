@@ -18,7 +18,15 @@ const server = createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: [CLIENT_URL, "http://localhost:5174", "http://localhost:5173", "http://127.0.0.1:5173", "http://127.0.0.1:5174"],
+    origin: [
+  CLIENT_URL,
+  "https://codemeet-subodh-kumars-projects-79cf1a01.vercel.app",
+  "https://codemeet-git-main-subodh-kumars-projects-79cf1a01.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174"
+],
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -30,7 +38,15 @@ app.use(cookieParser());
 
 app.use(
   cors({
-    origin: [CLIENT_URL, "http://localhost:5174", "http://localhost:5173", "http://127.0.0.1:5173", "http://127.0.0.1:5174"],
+   origin: [
+  CLIENT_URL,
+  "https://codemeet-subodh-kumars-projects-79cf1a01.vercel.app",
+  "https://codemeet-git-main-subodh-kumars-projects-79cf1a01.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174"
+],
     methods: ["GET", "POST"],
     credentials: true,
   })
