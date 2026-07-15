@@ -1,0 +1,16 @@
+{
+  "name": "codemeet-root",
+  "version": "1.0.0",
+  "description": "Root runner for CodeMeet (Frontend & Backend)",
+  "scripts": {
+    "install:backend": "npm install --prefix backend",
+    "install:frontend": "npm install --prefix frontend",
+    "install-all": "npm run install:backend && npm run install:frontend",
+    "backend": "npm start --prefix backend",
+    "frontend": "npm run dev --prefix frontend",
+    "start": "concurrently \"npm run backend\" \"npm run frontend\""
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

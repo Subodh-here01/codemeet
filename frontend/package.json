@@ -16,6 +16,7 @@
     "@monaco-editor/react": "^4.6.0",
     "@mui/material": "^5.15.19",
     "@tldraw/tldraw": "^2.2.0",
+    "codemeet-root": "file:..",
     "draft-js": "^0.11.7",
     "peerjs": "^1.5.4",
     "react": "^18.2.0",
