@@ -60,19 +60,31 @@ app.use("/api/execute", execute);
 io.on("connection", (socket) => {
   console.log(`User ${socket.id} connected`);
 
-  socket.on("joinRoom", (room) => {
+  socket.on("joinRoom", (data) => {
+    const room = typeof data === "string" ? data : data.room;
+    const status = typeof data === "object" ? data.status : undefined;
     socket.join(room);
-    console.log(`User ${socket.id} joined room ${room}`);
+    socket.room = room;
+    if (status) {
+      socket.status = status;
+    }
+    console.log(`User ${socket.id} joined room ${room} as ${status || "unknown"}`);
   });
 
   socket.on("peer-ready", ({ room, peerId, status }) => {
     socket.to(room).emit("peer-ready", { peerId, status });
+    socket.room = room;
+    socket.status = status;
     console.log(`Peer ready in room ${room}: ${status} (${peerId})`);
   });
 
   socket.on("leaveRoom", (room) => {
     socket.leave(room);
     console.log(`User ${socket.id} left room ${room}`);
+    if (socket.status === "interviewer") {
+      console.log(`Interviewer ${socket.id} left room ${room}, ending meeting`);
+      io.to(room).emit("meeting-ended");
+    }
   });
 
   socket.on("message", ({ room, data }) => {
@@ -117,6 +129,10 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     console.log(`User ${socket.id} disconnected`);
+    if (socket.room && socket.status === "interviewer") {
+      console.log(`Interviewer ${socket.id} disconnected from room ${socket.room}, ending meeting`);
+      io.to(socket.room).emit("meeting-ended");
+    }
   });
 });
 

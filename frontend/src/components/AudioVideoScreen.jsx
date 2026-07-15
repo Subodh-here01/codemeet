@@ -6,7 +6,7 @@ import Notepad from "./Notepad";
 import CodeEditor from "./CodeEditor";
 
 function AudioVideoScreen() {
-  const { roomId, peerInstance, status, socket, setPeerId } = useContext(DataContext);
+  const { roomId, setRoomId, peerInstance, status, setStatus, socket, setPeerId } = useContext(DataContext);
   const navigate = useNavigate();
   const remoteVideoRef = useRef(null);
   const currentUserVideoRef = useRef(null);
@@ -155,7 +155,7 @@ function AudioVideoScreen() {
 
     const handleConnect = () => {
       console.log("connected", socket.id);
-      socket.emit("joinRoom", roomId);
+      socket.emit("joinRoom", { room: roomId, status: status });
     };
 
     socket.on("connect", handleConnect);
@@ -361,12 +361,23 @@ function AudioVideoScreen() {
     };
     peerInstance.current.on("open", handlePeerOpen);
 
+    const handleMeetingEnded = () => {
+      alert("The interviewer has left the room. The meeting has ended.");
+      setRoomId("");
+      setStatus("");
+      navigate("/");
+    };
+
+    socket.on("meeting-ended", handleMeetingEnded);
+
     // Start fetching local stream
     localStreamPromiseRef.current = getLocalStream();
 
     return () => {
+      socket.emit("leaveRoom", roomId);
       socket.off("connect", handleConnect);
       socket.off("peer-ready", handlePeerReady);
+      socket.off("meeting-ended", handleMeetingEnded);
       setHasRemoteStream(false);
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => track.stop());
@@ -406,7 +417,11 @@ function AudioVideoScreen() {
             </span>
           </div>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => {
+              setRoomId("");
+              setStatus("");
+              navigate('/');
+            }}
             className="text-xs font-bold text-slate-400 hover:text-white bg-slate-900/50 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-900/50 px-4 py-2 rounded-xl transition-all shadow-sm active:scale-95"
           >
             Leave Room

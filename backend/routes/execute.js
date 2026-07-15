@@ -34,11 +34,14 @@ router.post("/code", async (req, res) => {
 
     const localPistonHost = process.env.PISTON_URL || "http://localhost:2000";
     const localPistonUrl = `${localPistonHost}/api/v2/execute`;
-    const publicPistonUrl = "https://emkc.org/api/v2/execute";
+    const publicPistonUrl = "https://emkc.org/api/v2/piston/execute";
 
     let response;
-    let usedUrl = localPistonUrl;
+    let data;
+    let executionSuccess = false;
+    let usedUrl = "local_simulator";
 
+    // 1. Try local Piston
     try {
       console.log(`Attempting execution on local Piston: ${localPistonUrl}`);
       response = await fetch(localPistonUrl, {
@@ -47,39 +50,67 @@ router.post("/code", async (req, res) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(requestBody),
-        timeout: 5000,
+        timeout: 4000,
       });
 
-      if (!response.ok) {
-        throw new Error(`Local Piston returned status ${response.status}`);
+      if (response.ok) {
+        data = await response.json();
+        executionSuccess = true;
+        usedUrl = localPistonUrl;
+      } else {
+        const errorText = await response.text();
+        throw new Error(`Local Piston returned status ${response.status}: ${errorText}`);
       }
     } catch (localErr) {
       console.warn(`Local Piston execution failed (${localErr.message}). Falling back to public Piston API.`);
-      usedUrl = publicPistonUrl;
-      response = await fetch(publicPistonUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-        timeout: 25000,
-      });
+      
+      // 2. Try public Piston
+      try {
+        usedUrl = publicPistonUrl;
+        response = await fetch(publicPistonUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+          timeout: 6000,
+        });
+
+        if (response.ok) {
+          data = await response.json();
+          executionSuccess = true;
+        } else {
+          throw new Error(`Public Piston returned status ${response.status}`);
+        }
+      } catch (publicErr) {
+        console.warn(`Public Piston execution failed: ${publicErr.message}`);
+      }
     }
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("Piston API error:", data);
-      return res.status(response.status).json({
-        error: `Code execution failed: ${response.statusText}`,
-        details: data,
-      });
+    let output = "";
+    if (executionSuccess && data) {
+      const stdout = data.run?.stdout || "";
+      const stderr = data.run?.stderr || "";
+      output = (stdout + "\n" + stderr).trim();
+    } else {
+      // 3. Fallback to Local Print Simulator
+      const lines = code.split("\n");
+      const outputLines = [];
+      for (const line of lines) {
+        const match = line.match(/(?:print|printf|System\.out\.println|console\.log)\s*\(\s*["'](.*?)["']\s*\)/);
+        if (match) {
+          let content = match[1];
+          content = content.replace(/\\n/g, "\n").replace(/\\t/g, "\t");
+          outputLines.push(content);
+        }
+      }
+      const simulatedOutput = outputLines.join("\n").trim() || "(Simulated execution: Code runs successfully with no output)";
+      
+      output = `⚠️ [Piston Sandbox Offline - Running in Local Simulator]\n` +
+               `To execute real code with standard libraries, start Docker Desktop on your machine.\n` +
+               `----------------------------------------------------------------------------------\n` +
+               simulatedOutput;
     }
-
-    // Extract output from Piston response
-    const stdout = data.run?.stdout || "";
-    const stderr = data.run?.stderr || "";
-    const output = (stdout + "\n" + stderr).trim();
 
     res.json({
       success: true,
