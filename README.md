@@ -1,3 +1,4 @@
+
 # codemeet
 
 codemeet is a collaborative interview-practice app that combines real-time audio/video, a shared code editor, and a built-in text notepad for session notes. The app uses a React frontend, an Express + Socket.IO backend, and MongoDB for authentication data.
