@@ -76,11 +76,11 @@ function Homepage() {
       <section className="flex flex-col lg:flex-row max-w-7xl mx-auto px-12 py-20 lg:py-28 justify-between items-center gap-16 w-full">
         <div className="lg:w-1/2 flex flex-col justify-center gap-6">
           <h1 className="text-5xl lg:text-6xl font-black tracking-tight leading-tight text-white">
-            Ace Your Interviews <br />
-            <span className="bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">With Confidence</span>
+            Collaborate in Real-Time <br />
+            <span className="bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">With Your Team</span>
           </h1>
           <p className="text-lg text-slate-400 font-medium leading-relaxed">
-            Collaborate in real-time, share audio/video streams, type in shared notes, and run code instantly in an environment designed for technical interviews.
+            Collaborate in real-time, share audio/video streams, type in shared notes, and run code instantly in a shared workspace built for developer collaboration.
           </p>
           {user ? (
             <div className="flex flex-wrap gap-4 mt-4">
@@ -93,7 +93,7 @@ function Homepage() {
                 className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold px-6 py-3 rounded-xl shadow-lg shadow-blue-500/10 transition-all active:scale-95 text-sm"
                 onClick={() => navigate("/login")}
               >
-                Start an Interview
+                Start a Meeting
               </button>
               <button
                 className="bg-transparent hover:bg-slate-900 text-slate-300 hover:text-white border border-slate-800 font-semibold px-6 py-3 rounded-xl transition-all active:scale-95 text-sm"

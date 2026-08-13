@@ -52,7 +52,7 @@ export const DataProvider = ({ children }) => {
 
     const savedStatus = sessionStorage.getItem("meet_status");
     const savedRoomId = sessionStorage.getItem("meet_roomId");
-    const peerIdToUse = (savedStatus === "interviewer" && savedRoomId) ? savedRoomId : undefined;
+    const peerIdToUse = (savedStatus === "host" && savedRoomId) ? savedRoomId : undefined;
 
     const peer = new Peer(peerIdToUse, {
       config: {

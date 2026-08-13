@@ -71,6 +71,33 @@ io.on("connection", (socket) => {
     console.log(`User ${socket.id} joined room ${room} as ${status || "unknown"}`);
   });
 
+  socket.on("request-join", ({ room, username }) => {
+    const clients = io.sockets.adapter.rooms.get(room);
+    const numClients = clients ? clients.size : 0;
+    if (numClients >= 2) {
+      socket.emit("join-full");
+      console.log(`User ${username} (${socket.id}) blocked from room ${room} because it is full.`);
+      return;
+    }
+    socket.to(room).emit("join-request", { username, socketId: socket.id });
+    console.log(`User ${username} (${socket.id}) requested to join room ${room}`);
+  });
+
+  socket.on("approve-join", ({ guestSocketId }) => {
+    io.to(guestSocketId).emit("join-approved");
+    console.log(`Join approved for guest socket ${guestSocketId}`);
+  });
+
+  socket.on("deny-join", ({ guestSocketId }) => {
+    io.to(guestSocketId).emit("join-denied");
+    console.log(`Join denied for guest socket ${guestSocketId}`);
+  });
+
+  socket.on("end-meeting", (room) => {
+    socket.to(room).emit("meeting-ended");
+    console.log(`Meeting in room ${room} ended explicitly by host`);
+  });
+
   socket.on("peer-ready", ({ room, peerId, status }) => {
     socket.to(room).emit("peer-ready", { peerId, status });
     socket.room = room;

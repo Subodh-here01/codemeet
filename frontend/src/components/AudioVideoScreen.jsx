@@ -6,7 +6,7 @@ import Notepad from "./Notepad";
 import CodeEditor from "./CodeEditor";
 
 function AudioVideoScreen() {
-  const { roomId, setRoomId, peerInstance, status, setStatus, socket, setPeerId } = useContext(DataContext);
+  const { roomId, setRoomId, peerInstance, status, setStatus, socket, setPeerId, user } = useContext(DataContext);
   const navigate = useNavigate();
   const remoteVideoRef = useRef(null);
   const currentUserVideoRef = useRef(null);
@@ -18,6 +18,9 @@ function AudioVideoScreen() {
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [streamError, setStreamError] = useState("");
   const [hasRemoteStream, setHasRemoteStream] = useState(false);
+  const [showRoomId, setShowRoomId] = useState(false);
+  const [remoteUsername, setRemoteUsername] = useState("Peer");
+  const [pendingJoinRequest, setPendingJoinRequest] = useState(null);
 
   const toggleMute = () => {
     if (localStreamRef.current) {
@@ -36,7 +39,6 @@ function AudioVideoScreen() {
   };
 
   const toggleVideo = async () => {
-    // If local stream is not active or initialized, let's attempt to acquire it now
     if (!localStreamRef.current) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: !isMuted });
@@ -49,7 +51,6 @@ function AudioVideoScreen() {
           currentUserVideoRef.current.play().catch((err) => console.error("Error playing local video:", err));
         }
 
-        // Add track to existing call if active
         if (activeCallRef.current && activeCallRef.current.peerConnection) {
           const newTrack = stream.getVideoTracks()[0];
           const transceivers = activeCallRef.current.peerConnection.getTransceivers();
@@ -73,14 +74,10 @@ function AudioVideoScreen() {
 
     const videoTracks = localStreamRef.current.getVideoTracks();
     if (videoTracks.length > 0 && !isVideoOff) {
-      // Turning video OFF: Stop the track to turn off the hardware light
       const track = videoTracks[0];
       track.stop();
-
-      // Remove track from local stream to stop rendering locally
       localStreamRef.current.removeTrack(track);
 
-      // Replace track with null on the WebRTC sender so the remote peer sees black screen
       if (activeCallRef.current && activeCallRef.current.peerConnection) {
         try {
           const transceivers = activeCallRef.current.peerConnection.getTransceivers();
@@ -97,24 +94,19 @@ function AudioVideoScreen() {
           console.error("Error replacing track with null:", err);
         }
       }
-
       setIsVideoOff(true);
     } else {
-      // Turning video ON: Re-acquire video stream from camera
       try {
         const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
         const newTrack = tempStream.getVideoTracks()[0];
 
-        // Remove any existing video tracks first
         localStreamRef.current.getVideoTracks().forEach((t) => {
           t.stop();
           localStreamRef.current.removeTrack(t);
         });
 
-        // Add new track to the local stream
         localStreamRef.current.addTrack(newTrack);
 
-        // Replace track on the WebRTC sender so the remote peer receives the new stream
         if (activeCallRef.current && activeCallRef.current.peerConnection) {
           try {
             const transceivers = activeCallRef.current.peerConnection.getTransceivers();
@@ -127,7 +119,6 @@ function AudioVideoScreen() {
             if (videoSender) {
               await videoSender.replaceTrack(newTrack);
             } else {
-              // If no video sender existed (audio-only call), add the track
               activeCallRef.current.peerConnection.addTrack(newTrack, localStreamRef.current);
             }
           } catch (err) {
@@ -135,7 +126,6 @@ function AudioVideoScreen() {
           }
         }
 
-        // Re-bind source object to trigger update in video player
         if (currentUserVideoRef.current) {
           currentUserVideoRef.current.srcObject = localStreamRef.current;
           currentUserVideoRef.current.play().catch((err) => {
@@ -160,13 +150,12 @@ function AudioVideoScreen() {
 
     socket.on("connect", handleConnect);
 
-    // Emit immediately if already connected
     if (socket.connected) {
       handleConnect();
     }
 
     if (!peerInstance.current || peerInstance.current.destroyed) {
-      const peerIdToUse = (status === "interviewer" && roomId) ? roomId : undefined;
+      const peerIdToUse = (status === "host" && roomId) ? roomId : undefined;
       const peer = new Peer(peerIdToUse, {
         config: {
           iceServers: [
@@ -224,7 +213,6 @@ function AudioVideoScreen() {
         localStreamRef.current = mediaStream;
         setStreamError("");
 
-        // Apply pre-existing mute/video state
         mediaStream.getAudioTracks().forEach((track) => {
           track.enabled = !isMuted;
         });
@@ -239,17 +227,16 @@ function AudioVideoScreen() {
           });
         }
 
-        // Notify other peer that we are ready
         if (peerInstance.current && peerInstance.current.id) {
           socket.emit("peer-ready", {
             room: roomId,
             peerId: peerInstance.current.id,
             status,
+            username: user,
           });
         }
 
-        // If this user is the interviewee, initiate the call to the interviewer (roomId)
-        if (status === "interviewee") {
+        if (status === "guest") {
           initiateCall(roomId, mediaStream);
         }
 
@@ -258,8 +245,7 @@ function AudioVideoScreen() {
         console.error("Failed to get local stream:", err);
         setStreamError(err.message || "Failed to access camera/microphone.");
 
-        // Even if local stream fails, if we are interviewee, we should still try to call the peer
-        if (status === "interviewee") {
+        if (status === "guest") {
           initiateCall(roomId, new MediaStream());
         }
         return null;
@@ -274,7 +260,9 @@ function AudioVideoScreen() {
         }
 
         console.log(`Calling peer: ${targetPeerId}`);
-        const call = peerInstance.current.call(targetPeerId, stream);
+        const call = peerInstance.current.call(targetPeerId, stream, {
+          metadata: { username: user }
+        });
         activeCallRef.current = call;
 
         call.on("stream", (remoteStream) => {
@@ -296,12 +284,13 @@ function AudioVideoScreen() {
       }
     };
 
-    // Listen for peer-ready signaling (in case the other peer joined after or reconnected)
-    const handlePeerReady = async ({ peerId: readyPeerId, status: readyStatus }) => {
-      console.log(`Peer ready event received: ${readyStatus} (${readyPeerId})`);
+    const handlePeerReady = async ({ peerId: readyPeerId, status: readyStatus, username: readyUsername }) => {
+      console.log(`Peer ready event received: ${readyStatus} (${readyPeerId}) from ${readyUsername}`);
+      if (readyUsername) {
+        setRemoteUsername(readyUsername);
+      }
 
-      // If we are interviewee and the interviewer becomes ready, call them
-      if (status === "interviewee" && readyStatus === "interviewer") {
+      if (status === "guest" && readyStatus === "host") {
         let stream = localStreamRef.current;
         if (!stream && localStreamPromiseRef.current) {
           stream = await localStreamPromiseRef.current;
@@ -312,9 +301,13 @@ function AudioVideoScreen() {
 
     socket.on("peer-ready", handlePeerReady);
 
-    // Listen for incoming calls (interviewer answers interviewee)
     const handleIncomingCall = async (incomingCall) => {
       console.log("Receiving incoming call...");
+      const callerUsername = incomingCall.options?.metadata?.username;
+      if (callerUsername) {
+        setRemoteUsername(callerUsername);
+      }
+
       if (activeCallRef.current) {
         console.log("Closing existing call to answer new incoming call");
         activeCallRef.current.close();
@@ -348,7 +341,6 @@ function AudioVideoScreen() {
 
     peerInstance.current.on("call", handleIncomingCall);
 
-    // Also handle peer open event to emit peer-ready if getLocalStream already completed
     const handlePeerOpen = (id) => {
       setPeerId(id);
       if (localStreamRef.current) {
@@ -356,27 +348,34 @@ function AudioVideoScreen() {
           room: roomId,
           peerId: id,
           status,
+          username: user,
         });
       }
     };
     peerInstance.current.on("open", handlePeerOpen);
 
+    const handleJoinRequest = ({ username, socketId }) => {
+      if (status === "host") {
+        setPendingJoinRequest({ username, socketId });
+      }
+    };
+    socket.on("join-request", handleJoinRequest);
+
     const handleMeetingEnded = () => {
-      alert("The interviewer has left the room. The meeting has ended.");
+      alert("The meeting has been ended by the host.");
       setRoomId("");
       setStatus("");
       navigate("/");
     };
-
     socket.on("meeting-ended", handleMeetingEnded);
 
-    // Start fetching local stream
     localStreamPromiseRef.current = getLocalStream();
 
     return () => {
       socket.emit("leaveRoom", roomId);
       socket.off("connect", handleConnect);
       socket.off("peer-ready", handlePeerReady);
+      socket.off("join-request", handleJoinRequest);
       socket.off("meeting-ended", handleMeetingEnded);
       setHasRemoteStream(false);
       if (localStreamRef.current) {
@@ -390,30 +389,45 @@ function AudioVideoScreen() {
         peerInstance.current.off("open", handlePeerOpen);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, status, peerInstance, socket, setPeerId]);
+  }, [roomId, status, peerInstance, socket, setPeerId, user]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100 flex flex-col">
-      {/* Header / Navbar */}
       <header className="flex items-center justify-between px-12 py-4 border-b border-slate-800/80 bg-slate-950/50 backdrop-blur-md sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <img src="/codemeet_logo.svg" alt="CodeMeet Logo" className="h-8 w-8 rounded-lg shadow-sm object-contain" />
           <div>
             <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">CodeMeet</h1>
-            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider -mt-0.5">Collaborative Interview</p>
+            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider -mt-0.5">Collaborative Workspace</p>
           </div>
         </div>
 
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 bg-slate-900/80 border border-slate-800 px-3.5 py-1.5 rounded-xl shadow-sm">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Room:</span>
-            <span className="text-xs font-mono font-bold text-blue-400 select-all">{roomId}</span>
+            {showRoomId ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-bold text-blue-400 select-all">{roomId}</span>
+                <button
+                  onClick={() => setShowRoomId(false)}
+                  className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2 py-0.5 rounded-lg border border-slate-700 transition-all"
+                >
+                  Hide
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowRoomId(true)}
+                className="text-xs font-bold text-blue-400 hover:text-blue-350 bg-slate-850 hover:bg-slate-800 px-3 py-1 rounded-lg border border-slate-700/50 transition-all"
+              >
+                Show Room ID
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2 bg-slate-900/80 border border-slate-800 px-3.5 py-1.5 rounded-xl shadow-sm">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Role:</span>
-            <span className={`text-xs font-bold uppercase tracking-wider ${status === "interviewer" ? "text-indigo-400" : "text-emerald-400"}`}>
-              {status}
+            <span className={`text-xs font-bold uppercase tracking-wider ${status === "host" ? "text-indigo-400" : "text-emerald-400"}`}>
+              {status === "host" ? "Host" : "Guest"}
             </span>
           </div>
           <button
@@ -422,16 +436,27 @@ function AudioVideoScreen() {
               setStatus("");
               navigate('/');
             }}
-            className="text-xs font-bold text-slate-400 hover:text-white bg-slate-900/50 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-900/50 px-4 py-2 rounded-xl transition-all shadow-sm active:scale-95"
+            className="text-xs font-bold text-slate-400 hover:text-white bg-slate-900/50 hover:bg-slate-800 border border-slate-850 px-4 py-2 rounded-xl transition-all shadow-sm active:scale-95"
+            title="Leave the room without ending the meeting"
           >
             Leave Room
           </button>
+          {status === "host" && (
+            <button
+              onClick={() => {
+                socket.emit("end-meeting", roomId);
+                navigate('/');
+              }}
+              className="text-xs font-bold text-white bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 border border-rose-900/40 px-4 py-2 rounded-xl transition-all shadow-sm active:scale-95"
+              title="End the meeting for all participants"
+            >
+              End Meeting
+            </button>
+          )}
         </div>
       </header>
 
-      {/* Main Workspace */}
       <main className="flex-1 flex flex-col p-6 max-w-7xl mx-auto w-full gap-6">
-        {/* Top Section: Videos and Notepad */}
         <div className="flex flex-col md:flex-row w-full gap-6 items-stretch min-h-[320px]">
           {/* User Video */}
           <div className="w-full md:w-1/3 flex flex-col">
@@ -445,7 +470,6 @@ function AudioVideoScreen() {
                 className="w-full h-full object-cover scale-x-[-1]"
               />
 
-              {/* Stream Error Overlay */}
               {streamError && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/95 p-4 text-center z-10">
                   <div className="w-12 h-12 rounded-full bg-rose-950/50 flex items-center justify-center border border-rose-900/40 text-rose-400 mb-2">
@@ -458,12 +482,11 @@ function AudioVideoScreen() {
                 </div>
               )}
 
-              {/* Camera Off Overlay */}
               {!streamError && isVideoOff && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 z-10">
                   <div className="w-12 h-12 rounded-full bg-slate-900 flex items-center justify-center border border-slate-800 text-slate-500 mb-2">
                     <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2" />
+                      <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2 2V7a2 2 0 0 1 2-2h2" />
                       <path d="M10.68 10.68a2 2 0 0 1-2.83-2.83" />
                       <path d="m22 8-6 4 6 4V8Z" />
                       <line x1="2" x2="22" y1="2" y2="22" />
@@ -473,12 +496,10 @@ function AudioVideoScreen() {
                 </div>
               )}
 
-              {/* Overlay Badge */}
               <div className="absolute bottom-3 left-3 bg-slate-950/80 backdrop-blur-md border border-slate-800/60 text-[10px] font-bold text-slate-200 px-2.5 py-1 rounded-full uppercase tracking-wider z-20">
-                {status === "interviewer" ? "Interviewer" : "Interviewee"} (You)
+                {user || "You"} (You)
               </div>
 
-              {/* Controls overlay */}
               <div className="absolute bottom-3 right-3 flex items-center gap-2 z-20">
                 <button
                   onClick={toggleMute}
@@ -546,11 +567,9 @@ function AudioVideoScreen() {
                 playsInline
                 className="w-full h-full object-cover"
               />
-              {/* Overlay Badge */}
               <div className="absolute bottom-3 left-3 bg-indigo-950/90 backdrop-blur-md border border-indigo-900/60 text-[10px] font-bold text-indigo-300 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                {status === "interviewer" ? "Interviewee" : "Interviewer"}
+                {remoteUsername}
               </div>
-              {/* Placeholder when video is not active */}
               {!hasRemoteStream && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/95 p-4 text-center">
                   <div className="w-12 h-12 rounded-full bg-slate-900 flex items-center justify-center border border-slate-800 text-slate-400 animate-pulse mb-2">
@@ -565,11 +584,47 @@ function AudioVideoScreen() {
           </div>
         </div>
 
-        {/* Bottom Section: Code Editor */}
         <div className="flex-1 flex flex-col">
           <CodeEditor socket={socket} roomId={roomId} />
         </div>
       </main>
+
+      {/* Host Approval Modal */}
+      {pendingJoinRequest && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/85 backdrop-blur-sm z-[100] p-4">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl w-full max-w-sm text-slate-100 text-center">
+            <div className="w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mx-auto mb-4 animate-bounce">
+              <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">Join Request</h3>
+            <p className="text-sm text-slate-300 mb-6">
+              <span className="font-bold text-blue-400">{pendingJoinRequest.username}</span> wants to join the meeting room.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => {
+                  socket.emit("deny-join", { guestSocketId: pendingJoinRequest.socketId });
+                  setPendingJoinRequest(null);
+                }}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold px-5 py-2.5 rounded-xl text-sm transition-all"
+              >
+                Deny
+              </button>
+              <button
+                onClick={() => {
+                  socket.emit("approve-join", { guestSocketId: pendingJoinRequest.socketId });
+                  setPendingJoinRequest(null);
+                }}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-all shadow-md active:scale-95"
+              >
+                Allow Entry
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -18,10 +18,10 @@ export const login = async (req, res) => {
                 res.cookie("token", token);
                 return res.status(200).send({ message: "login success", data: token });
             } else {
-                return res.status(401).send("password incorrect");
+                return res.status(401).send("Password incorrect");
             }
         } else {
-            return res.status(404).send("user not found");
+            return res.status(404).send("Username not found in our database");
         }
     } catch (error) {
         console.log(error);
