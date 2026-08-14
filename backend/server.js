@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 import connectdb from "./db/connectDb.js";
 import cookieParser from "cookie-parser";
 import auth from "./routes/auth.js";
-import execute from "./routes/execute.js"; // Real Piston executor (requires Docker)
+import execute from "./routes/execute.js";
 
 dotenv.config();
 
@@ -79,7 +79,7 @@ io.on("connection", (socket) => {
       console.log(`User ${username} (${socket.id}) blocked from room ${room} because it is full.`);
       return;
     }
-    socket.to(room).emit("join-request", { username, socketId: socket.id });
+    io.to(room).emit("join-request", { username, socketId: socket.id });
     console.log(`User ${username} (${socket.id}) requested to join room ${room}`);
   });
 
