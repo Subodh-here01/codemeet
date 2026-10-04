@@ -113,4 +113,4 @@ The backend Socket.IO server supports room-based collaboration for:
 
 ## License
 
-No license has been specified for this repository.// trigger azure pipeline
+No license has been specified for this repository.
