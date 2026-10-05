@@ -8,25 +8,5 @@ services:
       - piston-data:/piston
     privileged: true
 
-  backend:
-    build: ./backend
-    ports:
-      - "3000:3000"
-    environment:
-      MONGO_URI: "mongodb://host.docker.internal:27017/codemeet"
-      PORT: "3000"
-      PISTON_URL: "http://piston:2000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      - piston
-
-  frontend:
-    build: ./frontend
-    ports:
-      - "5173:5173"
-    depends_on:
-      - backend
-
 volumes:
   piston-data:
